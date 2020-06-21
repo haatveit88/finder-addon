@@ -1,6 +1,8 @@
 # /Finder
 **/Finder** is a World of Warcraft AddOn that lets you search for any item in the game, and show an item link for it.
 
+![https://github.com/Haatveit88/finder-addon/releases/latest/download/Finder.zip](https://img.shields.io/badge/dynamic/json.svg?label=download%20latest&url=https%3A%2F%2Fapi.github.com%2Frepos%2FHaatveit88%2Ffinder-addon%2Freleases%2Flatest&query=%24.assets[0].name&style=for-the-badge)
+
 # Usage
 (Make sure you've *built your item cache first*, see [Cache](#cache) down below for how that works.)
 
