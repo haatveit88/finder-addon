@@ -3,6 +3,21 @@
 
 [![Download Latest](https://img.shields.io/badge/dynamic/json.svg?label=download%20latest&url=https%3A%2F%2Fapi.github.com%2Frepos%2FHaatveit88%2Ffinder-addon%2Freleases%2Flatest&query=%24.assets[0].name&style=for-the-badge)](https://github.com/Haatveit88/finder-addon/releases/latest/download/Finder.zip)
 
+# Installation
+Installs like any WoW addon, if you are unsure of the process, these are the quick steps:
+
+1. Download latest release (link above).
+2. Unzip the .zip file anywhere, you should end up with a folder named `Finder`
+3. Copy (or move) the `Finder` folder to your AddOns directory: `World of Warcraft\_VERSION_\Interface\AddOns`
+
+Replace `_VERSION_` with the version of WoW you are installing to, either `_classic_` or `_retail_`.
+
+**/Finder** should be enabled by default, but double-check your addon list when you start the game.
+
+On login, you should see a welcome message from **/Finder**, although it may get lost in the spam of other AddOn login messages!
+
+Type `/finder` for a quick help message to get started. For more info, see the rest of this Readme.
+
 # Usage
 (Make sure you've *built your item cache first*, see [Cache](#cache) down below for how that works.)
 
