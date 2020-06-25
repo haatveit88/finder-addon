@@ -9,6 +9,7 @@ Installs like any WoW addon, if you are unsure of the process, these are the qui
 1. Download latest release (link above).
 2. Unzip the .zip file anywhere, you should end up with a folder named `Finder`
 3. Copy (or move) the `Finder` folder to your AddOns directory: `World of Warcraft\_VERSION_\Interface\AddOns`
+4. MAKE SURE that the name of the folder is `Finder`, rename it if needed (for example, if you downloaded the GitHub source zip file, it will be named `finder-master` after extracting).
 
 Replace `_VERSION_` with the version of WoW you are installing to, either `_classic_` or `_retail_`.
 
