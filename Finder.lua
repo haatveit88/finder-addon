@@ -349,7 +349,11 @@ local function commandHandler(msg, EditBox)
 	elseif cmd == "rebuild" then
 		rebuildCache()
 	elseif cmd == "search" or cmd == "find" or cmd == "s" then
-		searchHandler(table.concat(args, " ", 2), EditBox)
+		if args[2] then
+			searchHandler(table.concat(args, " ", 2), EditBox)
+		else
+			printHelp()
+		end
 	elseif cmd == "stop" or cmd == "abort" or cmd == "cancel" then
 		print(fmsg("Stopping cache rebuild"))
 		stopCacheRebuild()
