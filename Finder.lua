@@ -296,7 +296,11 @@ local function searchHandler(fragment, EditBox)
 	fragment = strtrim(fragment) -- trim it
 	fragment = fragment:lower() -- lowercase it
 
-	findItem(fragment)
+	if fragment:match("[^%s]") then
+		findItem(fragment)
+	else
+		printHelp()
+	end
 end
 
 -- SlashCmd handler for interacting with the addon configuration etc, NOT for searching (unless passing the 'search' argument)
@@ -349,11 +353,7 @@ local function commandHandler(msg, EditBox)
 	elseif cmd == "rebuild" then
 		rebuildCache()
 	elseif cmd == "search" or cmd == "find" or cmd == "s" then
-		if args[2] then
-			searchHandler(table.concat(args, " ", 2), EditBox)
-		else
-			printHelp()
-		end
+		searchHandler(table.concat(args, " ", 2), EditBox)
 	elseif cmd == "stop" or cmd == "abort" or cmd == "cancel" then
 		print(fmsg("Stopping cache rebuild"))
 		stopCacheRebuild()
