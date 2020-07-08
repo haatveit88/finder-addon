@@ -1,7 +1,7 @@
-## Interface: 11304
+## Interface: 11305
 ## Title: |cffa335eeFinder|r
 ## Author: Avael
-## Version: 0.1
+## Version: 0.1.2
 ## Notes: Easily search for any item in the game using |cffffffff/find |cfff90000<|cff9d9d9dname fragment|cfff90000>|r
 ## SavedVariablesPerCharacter: FinderOptions
 ## SavedVariables: FinderCache
