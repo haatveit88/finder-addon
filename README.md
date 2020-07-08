@@ -45,7 +45,7 @@ Hopefully in the future I will add fuzzy searching, allowing for missing or mis-
 
 # Cache
 Before you use **/Finder** for the first time, you have to build the item cache it uses for searching. This is simple, automatic, and happens in the background!
-To strigger a cache rebuild, simply type:
+To trigger a cache rebuild, simply type:
 
 `/finder rebuild`  (Notice the slash command here is `/finder`, not `/find`!)
 
