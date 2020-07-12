@@ -351,7 +351,7 @@ local function commandHandler(msg, EditBox)
 		end
 		print(fmsg("User options been reset"))
 	elseif cmd == "rebuild" then
-		rebuildCache()
+		rebuildCache(tonumber(args[2]), tonumber(args[3]))
 	elseif cmd == "search" or cmd == "find" or cmd == "s" then
 		searchHandler(table.concat(args, " ", 2), EditBox)
 	elseif cmd == "stop" or cmd == "abort" or cmd == "cancel" then
