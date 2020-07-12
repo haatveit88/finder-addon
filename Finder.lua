@@ -136,7 +136,9 @@ end
 -- queries for a batch of items
 local function queryBatch(first, last)
 	for i=first, last do
-		GetItemInfo(i)
+		if cItemExists(i) then
+			GetItemInfo(i)
+		end
 	end
 end
 
