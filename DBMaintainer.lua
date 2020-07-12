@@ -80,8 +80,6 @@ upgradeDB[1] = function(db)
         end
     end
 
-    error("debug err")
-
     return true
 end
 
