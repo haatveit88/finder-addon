@@ -139,7 +139,11 @@ end)
 -- used to prepare the cache structure (after a wipe, fresh install, db failed verification, etc)
 function prepareCache()
 	-- using WoW's wipe() since 'data = {}' simply resets the pointer and the global SavedVariable doesn't actually get wiped
-	wipe(FinderCache)
+	if FinderCache then
+		wipe(FinderCache)
+	else
+		FinderCache = {}
+	end
 
 	finder.db.initNewDB(FinderCache)
 
