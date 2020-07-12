@@ -49,7 +49,7 @@ To trigger a cache rebuild, simply type:
 
 `/finder rebuild`  (Notice the slash command here is `/finder`, not `/find`!)
 
-**/Finder** will then request from the server and store information about every item in the game, one by one. This should take about 4 minutes by default (see [Config](#configuration)). The reason it takes a long time is because WoW servers will disconnect any client making too many requests per second, so it has to be done more slowly! The rebuild process will tell you when it's finished.
+**/Finder** will then request from the server and store information about every item in the game, one by one. This should take about 35 seconds by default (see [Config](#configuration)). The reason it takes a long time is because WoW servers will disconnect any client making too many requests per second, so it has to be done more slowly! The rebuild process will tell you when it's finished.
 
 If the rebuild progress updates are annoying you, you can mute them using `/finder hush`, this will mute (or unmute) the messages for this particular rebuild. It will always tell you when it's done, regardless of mute status.
 
@@ -64,16 +64,16 @@ Finally, you can stop the current rebuild using `/finder stop/abort/cancel`. Thi
 Here are a few:
 
 * `/finder set <option> <value>` allows you to change some configuration options. Right now, only 3 options are exposed:
-    * `<progressinterval> <2500>` - this sets how many item requests to complete, before posting a progress update message to the chat window.
+    * `<progressinterval> <5000>` - this sets how many item requests to complete, before posting a progress update message to the chat window.
     * `<speed> <slow>` - some presets for rebuild speed. Valid options are:
-        * `glacial = 50 items/sec`
-        * `slow = 100 items/sec`
-        * `normal = 250 items/sec`
-        * `fast = 500 items/sec`
+        * `glacial = 100 items/sec`
+        * `slow = 250 items/sec`
+        * `normal = 500 items/sec`
+        * `fast = 750 items/sec`
         * `insane = 1000 items/sec` *Possible disconnect risk, massive frame drops!*
         * `custom = <custombatchsize>` *See below*
     * `<custombatchsize> <50>` - this sets how many item requests the rebuild process makes per second, *ONLY if you are using the "custom" speed option above*
-    * The default speed is `slow`, becuase it has a very minor effect on game performance, and finishes relatively quickly (~250 seconds). Feel free to experiment. Faster speeds are potentially *much* faster, but your client *will* stutter once per second while doing it.
+    * The default speed is `normal`, becuase it has a very minor effect on game performance, and finishes quite quickly (~35 seconds). Feel free to experiment. Faster speeds are potentially *much* faster, but your client *will* stutter while doing it.
 * `/finder wipe` allows you to wipe out the item cache. Pay attention to the messages, as you have to type this command TWICE in a row, to actually wipe the cache. This is to avoid accidents!
 * `/finder wipesettings` - this will wipe out the per-character configuration options, such as `speed` and `progressinterval` (see above)
 * `/finder status` - this will tell you whether **/Finder** believes its item cache is healthy or not. Emphasis on *believes*...
@@ -83,4 +83,4 @@ Here are a few:
 
 **/Finder** builds a cache of *all items in the game* that it then uses for searching. This might sound excessive, however it is required because World of Warcraft does not actually offer a simple way to search / query the servers for an item, by its name. The game only allows direct queries about `itemID`'s, which are just numbers, and not very helpful. Therefore, to actually search the game for an item using its plain text item name, a database needs to be built from the ground up. And that's exactly what **/Finder** does when it `/finder rebuild`s the cache.
 
-Right now, **/Finder** also stores the actual whole itemLink in the cache, so that it can be immediately posted when a search hit is made, in the future I might avoid this (and massively reduce the SavedVariable file size) since I don't think it's necessary, I just didn't want to write code to get the link on the fly.
+The first version of **/Finder** stored a large amount of data in this cache, however current and future versions will make an effort to reduce this, so speed up game loading / UI reloading / player logout.

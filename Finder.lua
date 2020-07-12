@@ -1,12 +1,14 @@
 local ADDON, finder = ...
 --SavedVariablesPerCharacter: FinderOptions
 --SavedVariables: FinderCache
+local FINDER_VERSION = GetAddOnMetadata(ADDON, "Version")
 
 -- local vars
 local cPurple = "|cffa335ee"
 local confirmTimer
 local confirmWipe = false -- used for 2 step cache wipe command
 local WIPE_TIMER_DURATION = 60 -- safety timer for user to type '/finder wipe' a 2nd time in order to wipe the item cache
+local cItemExists = C_Item.DoesItemExistByID
 
 -- some options
 local MAX_HITS = 20
@@ -14,11 +16,13 @@ local hush = false -- this silences rebuild progress updates for the duration of
 
 -- cache rebuild stuff
 -- TODO: some of this should be player options
-local CACHE_MAX_ITEMID = 25000
+local CACHE_MAX_ITEMID = 25000 -- 175500 = max for retail BFA, 25000 = max for Classic 1.13.5
 local CACHE_STOP_REBUILD = false
 local CACHE_REBUILDING = false -- changes to an int when rebuilding, indicating current itemID position
 local CACHE_IS_PREPARED = false
-local CACHE_CURRENT_REQUESTS = {}
+local CACHE_REBUILD_BATCHINTERVAL = 0.1 -- should maybe be a config option?
+local MAX_WAIT_TIME = 5 -- the maximum amount of time we're willing to wait for GetItemInfo() to return results. If exceeded, print what we got so far, plus a warning
+local CACHE_CURRENT_REQUESTS = {} -- item info queue
 
 -- forward dec
 local addOrUpdateCache
@@ -27,11 +31,10 @@ local prepareCache
 -- enums
 local SCAN_SPEED = {
 	insane = 1000,
-	fast = 500,
-	normal = 250,
-	slow = 100,
-	glacial = 50,
-	custom = true,
+	fast = 750,
+	normal = 500,
+	slow = 250,
+	glacial = 100,
 }
 
 -- helpers
@@ -51,6 +54,19 @@ local function getDefaults(category)
 	return t
 end
 
+-- quick and dirty table_contains implementation for array tables
+local function tcontains(table, item)
+	local index = 1
+	while table[index] do
+		if (item == table[index]) then
+			return index
+		end
+		index = index + 1
+	end
+
+	return false
+end
+
 -- event frame setup
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
@@ -66,17 +82,41 @@ function handlers.ADDON_LOADED(self, ...)
 		-- Hook up SavedVariable
 		FinderOptions = FinderOptions or getDefaults("options")
 
+		-- Check if we need to do any forced setting upgrades
+		if not FinderOptions._ver then
+			-- < v0.1.2, re-set 'speed' opt to normal
+			FinderOptions.speed = "normal"
+			FinderOptions._ver = FINDER_VERSION
+		end
+
 		if (not (type(FinderCache) == "table")) then
 			prepareCache()
 		else
 			CACHE_IS_PREPARED = true
 		end
 
-		if (not FinderCache.completedScan) then
-			print(fmsg("|cfff00000It looks like you have not built the item cache!|r Try '/finder rebuild' to populate the cache."))
+		-- check database version and try to upgrade if possible
+		local dbUpgraded, success, message = finder.db.checkDBVersion(FinderCache)
+		if dbUpgraded then
+			if success then
+				-- successful db upgrade, mention it
+				print(fmsg("Item cache was |cffff8000UPGRADED|r to version |cffa335ee%i|r."):format(message))
+			else
+				-- failed db upgrade!!
+				-- TODO: wipe it and let the player know
+				print(fmsg("|cfff00000!!Item cache was CORRUPT and could NOT be repaired!! It has been wiped out :(|r"))
+				print(fmsg("|cfff00000!!Error given: %s|r"):format(message))
+				print(fmsg("|cfff00000!!Please rebuild (|cffffffff'/finder rebuild'|cfff00000) to re-populate the cache.|r"))
+				prepareCache()
+			end
 		else
-			print(fmsg("Item cache looks |cff00f000OK|r."))
+			if (not FinderCache.completedScan) then
+				print(fmsg("|cfff00000It looks like you have not built the item cache! Try|r |cffffffff'/finder rebuild'|cfff00000 to populate the cache."))
+			else
+				print(fmsg("Item cache looks |cff00f000OK|r."))
+			end
 		end
+
 	end
 end
 
@@ -96,15 +136,12 @@ end)
 -- rest of the fucking owl
 --------------------------
 
--- used to prepare the cache structure (after a wipe, or fresh start, f.ex.)
+-- used to prepare the cache structure (after a wipe, fresh install, db failed verification, etc)
 function prepareCache()
-	FinderCache = {}
-	for i = 0, NUM_LE_ITEM_CLASSS do
-		local class = GetItemClassInfo(i)
-		if class then
-			FinderCache[i] = {}
-		end
-	end
+	-- using WoW's wipe() since 'data = {}' simply resets the pointer and the global SavedVariable doesn't actually get wiped
+	wipe(FinderCache)
+
+	finder.db.initNewDB(FinderCache)
 
 	FinderCache.completedScan = false
 	CACHE_IS_PREPARED = true
@@ -120,10 +157,7 @@ function addOrUpdateCache(validID)
 	itemEquipLoc, itemIcon, itemSellPrice, itemClassID, itemSubClassID, bindType, expacID, itemSetID,
 	isCraftingReagent = GetItemInfo(validID)
 
-	FinderCache[itemClassID][itemName] = {
-		id = validID,
-		link = itemLink
-	}
+	FinderCache[itemClassID][validID] = itemName
 end
 
 -- stop any in-progress cache rebuild
@@ -131,15 +165,7 @@ local function stopCacheRebuild()
 	CACHE_REBUILDING = false
 	CACHE_STOP_REBUILD = true
 	hush = false
-end
-
--- queries for a batch of items
-local function queryBatch(first, last)
-	for i=first, last do
-		if cItemExists(i) then
-			GetItemInfo(i)
-		end
-	end
+	FinderCache.completedScan = false -- we're in an impartial scan state
 end
 
 -- rebuild item cache
@@ -147,48 +173,57 @@ local function rebuildCache(startID, endID)
 	if not CACHE_REBUILDING then
 		CACHE_STOP_REBUILD = false
 
-		endID = endID or CACHE_MAX_ITEMID
-		startID = startID or 0
+		local validIDs = {}
+		for i = startID or 0, endID or CACHE_MAX_ITEMID do
+			if cItemExists(i) then
+				tinsert(validIDs, i)
+			end
+		end
 
 		frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 
-		CACHE_REBUILDING = startID
+		CACHE_REBUILDING = 1
 		local tickerHandle
-		local lastUpdate = startID
+		local lastUpdate = 0
 		local startedTimer = GetTime()
+		local itemsTotal = #validIDs
 
-		local batchsize = (function()
+		local batchsize = math.floor((function()
 			if FinderOptions.speed == "custom" then
 				return FinderOptions.custombatchsize
 			else
 				return SCAN_SPEED[FinderOptions.speed] or SCAN_SPEED.glacial
 			end
-		end)()
+		end)() * CACHE_REBUILD_BATCHINTERVAL)
 
-		print(fmsg(("Rebuilding item cache... This should take about ~%.0f seconds. Type '/finder hush' to disable progress updates for this rebuild. Type '/finder stop' to abort the rebuild."):format(((endID-startID) / batchsize))))
+		print(batchsize)
+
+		print(fmsg(("Rebuilding item cache... This should take at most ~%.0f seconds. Type '/finder hush' to disable progress updates for this rebuild. Type '/finder stop' to abort the rebuild."):format((itemsTotal / batchsize * CACHE_REBUILD_BATCHINTERVAL))))
 
 		local function worker()
 			if CACHE_STOP_REBUILD or (not CACHE_REBUILDING) then
 				tickerHandle:Cancel()
-			elseif CACHE_REBUILDING < endID then
-				local nextBatch = math.min(endID - CACHE_REBUILDING, batchsize)
-				queryBatch(CACHE_REBUILDING, CACHE_REBUILDING + nextBatch)
+				CACHE_STOP_REBUILD = false
+				CACHE_REBUILDING = false
+			elseif CACHE_REBUILDING < #validIDs then
+				local nextBatch = math.min(itemsTotal - CACHE_REBUILDING, batchsize)
+
+				-- queries for a batch of items
+				for i=CACHE_REBUILDING, (CACHE_REBUILDING + nextBatch) - 1 do
+					GetItemInfo(validIDs[i])
+				end
 
 				CACHE_REBUILDING = CACHE_REBUILDING + nextBatch
 
 				if (CACHE_REBUILDING - lastUpdate) >= FinderOptions.progressinterval then
-					local itemsTotal = (endID-startID)
 					local progress = (CACHE_REBUILDING / itemsTotal)
 
-					local itemsProcessed = (CACHE_REBUILDING-startID)
-					local itemsRemaining = itemsTotal - itemsProcessed
-
-					local timePerUpdate = (GetTime() - startedTimer) / itemsProcessed
-
+					local itemsRemaining = itemsTotal - CACHE_REBUILDING
+					local timePerUpdate = (GetTime() - startedTimer) / CACHE_REBUILDING
 					local estimate = itemsRemaining * timePerUpdate
 
 					if not hush then
-						local msg = ("Rebuild status: %i/%i (%i%%), ~%i seconds remaining"):format(CACHE_REBUILDING, endID, math.floor(progress*100), estimate	)
+						local msg = ("Rebuild status: %i/%i (%i%%), ~%i seconds remaining"):format(CACHE_REBUILDING - 1, itemsTotal, math.floor(progress*100), estimate	)
 						print(fmsg(msg))
 					end
 
@@ -205,19 +240,62 @@ local function rebuildCache(startID, endID)
 			end
 		end
 
-		tickerHandle = C_Timer.NewTicker(1, worker, endID-startID)
+		tickerHandle = C_Timer.NewTicker(CACHE_REBUILD_BATCHINTERVAL, worker, itemsTotal)
 	end
 end
 
+-- print search results
+local function printResults(results, hits, searchTime, expired)
+	--[[
+	results = {
+		[0] = {
+			items = {},
+			count = 0
+		}
+	}
+	]]
+
+	local output = DEFAULT_CHAT_FRAME
+	local timeStr = ("|cff9d9d9d(%ims)|r"):format(math.floor(searchTime) * 1000)
+
+	if expired then
+		-- warn that our search expired and results may be incomplete
+		local msg = ("(|cfff00000Servers response is slow (>%.1fs), search results may be incomplete. You may want to try again|r)"):format(MAX_WAIT_TIME)
+		output:AddMessage(msg)
+	end
+
+	if hits == MAX_HITS then
+		local msg = ("(|cfff00000Hit the result cap of |cff00ccff%i|r, try narrowing down your search!): %s"):format(MAX_HITS, timeStr)
+		output:AddMessage(msg)
+	else
+		output:AddMessage(fmsg(("Found %i hits: %s"):format(hits, timeStr)))
+	end
+
+	for category, data in pairs(results) do
+		output:AddMessage(("|cffe6cc80%s|r (%i):"):format(GetItemClassInfo(category), data.count))
+
+		for k, item in pairs(data.items) do
+			output:AddMessage(("    %s"):format(item.link))
+		end
+	end
+end
+
+-- perform actual item search
 local function findItem(fragment)
 	if not FinderCache.completedScan then
 		print(fmsg("(|cfff00000INCOMPLETE or EMPTY ITEMCACHE!|r You should /finder rebuild)"))
 	end
 
+	print(fmsg("Searching for \"".. fragment .."\"..."))
+
+	local startTime = GetTime()
 	local maxhits = 20
 	local hits = 0
 	local results = {}
 	local stop
+
+	-- clear the itemQueue table in case it has any previous search queries. Said previous queries will be mercilessly abandoned!
+	wipe(CACHE_CURRENT_REQUESTS)
 
 	for category = 0, #FinderCache do
 		local items = FinderCache[category]
@@ -225,7 +303,7 @@ local function findItem(fragment)
 		if stop then
 			break
 		else
-			for name, item in pairs(items) do
+			for id, name in pairs(items) do
 				if name:lower():find(fragment) then
 					results[category] = results[category] or {
 						items = {},
@@ -233,10 +311,25 @@ local function findItem(fragment)
 					}
 
 					results[category].count = results[category].count + 1
-					tinsert(results[category].items, {
-						id = item.id,
-						link = item.link
-					})
+
+					tinsert(CACHE_CURRENT_REQUESTS, id)
+					local item = Item:CreateFromItemID(id)
+
+
+					item:ContinueOnItemLoad(function()
+						local _, link = GetItemInfo(id)
+
+						tinsert(results[category].items, {
+							id = id,
+							link = item:GetItemLink()
+						})
+
+
+						local qIndex = tcontains(CACHE_CURRENT_REQUESTS, id)
+						if qIndex then
+							tremove(CACHE_CURRENT_REQUESTS, qIndex)
+						end
+					end)
 
 					hits = hits + 1
 
@@ -249,30 +342,30 @@ local function findItem(fragment)
 		end
 	end
 
-	--[[
-	results = {
-		[0] = {
-			items = {},
-			count = 0
-		}
-	}
-	]]
-
+	-- only do something if we got >0 results
 	if hits > 0 then
-		DEFAULT_CHAT_FRAME:AddMessage("\n")
-		print(fmsg("Searching for \"".. fragment .."\"..."))
-		local output = DEFAULT_CHAT_FRAME
-		output:AddMessage(fmsg(("Found %i hits:"):format(hits)))
-		if hits == MAX_HITS then
-			output:AddMessage(("(|cfff00000Hit the result cap of |cff00ccff%i|r, try narrowing down your search!):"):format(MAX_HITS))
-		end
-		for category, data in pairs(results) do
-			output:AddMessage(("|cffe6cc80%s|r (%i):"):format(GetItemClassInfo(category), data.count))
+		local triggerTime = GetTime()
+		local lastPoll = triggerTime
+		local poller
 
-			for k, item in pairs(data.items) do
-				output:AddMessage(("    %s"):format(item.link))
+		-- polls the itemQueue until it is either empty or we've exceeded the max wait time
+		local function pollQueue()
+			local time = GetTime()
+			local waited = time - triggerTime
+			local expired = (waited >= MAX_WAIT_TIME)
+
+			if expired or (#CACHE_CURRENT_REQUESTS == 0) then
+				printResults(results, hits, (time - startTime) - (lastPoll - time), expired)
+
+				-- remember to stop the ticker
+				poller:Cancel()
 			end
+
+			lastPoll = time
 		end
+
+		-- start polling the itemQueue
+		poller = C_Timer.NewTicker(0.01, pollQueue)
 	else
 		print(fmsg("Found nothing at all while searching for \""..fragment.."\""))
 	end
@@ -324,8 +417,8 @@ local function commandHandler(msg, EditBox)
 
 	if cmd == "wipe" then
 		if confirmWipe then
-			-- using WoW's wipe() since 'data = {}' simply resets the pointer and the global SavedVariable doesn't actually get wiped
-			wipe(FinderCache)
+			-- trigger wipe
+			prepareCache()
 
 			PlaySound(5694, "Master")
 			print(fmsg("Item cache has been wiped! SpooOooky! |cfff90000Start rebuilding it using /finder rebuild|r"))
@@ -334,9 +427,6 @@ local function commandHandler(msg, EditBox)
 			end
 
 			confirmWipe = false -- reset the confirmation step
-
-			-- prebuild some cache table structure
-			prepareCache()
 		else
 			print(fmsg("You are trying to wipe the Finder item cache. Type '/finder wipe' again within "..WIPE_TIMER_DURATION.." seconds to confirm!"))
 			confirmWipe = true

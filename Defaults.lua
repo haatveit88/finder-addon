@@ -4,6 +4,6 @@ finder.defaults = {}
 
 finder.defaults.options = {
     custombatchsize = 50,
-    progressinterval = 2500,
-    speed = "slow",
+    progressinterval = 5000,
+    speed = "normal",
 }
