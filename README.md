@@ -19,6 +19,12 @@ On login, you should see a welcome message from **/Finder**, although it may get
 
 Type `/finder` for a quick help message to get started. For more info, see the rest of this Readme.
 
+# Incompatibility note
+Unfortunately, **/Finder** uses the exact same commands as the "Search" module included with the [Prat](https://www.curseforge.com/wow/addons/prat-3-0 "Prat") chat addon. This means, if you have Prat installed, with the Search module enabled, the two default **/Finder** commands `/find` and `/search` will *not* work. You have two options:
+
+* Disable the Search module within Prat. (`/prat` - Module Control tab - set the "Search" module to "Don't Load"). 
+* Use the long and much less convenient version of the **/Finder** search command: `/finder search 'search term'` 
+
 # Usage
 (Make sure you've *built your item cache first*, see [Cache](#cache) down below for how that works.)
 
