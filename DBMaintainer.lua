@@ -48,6 +48,9 @@ local function initNewDB(db)
     -- append version
     db.__DBVERSION = DB_CURRENT_VERSION
 
+    -- append TOC version so we know how old the db is
+    db.__tocversion = select(4, GetBuildInfo())
+
     return true
 end
 

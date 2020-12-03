@@ -110,7 +110,12 @@ function handlers.ADDON_LOADED(self, ...)
 				prepareCache()
 			end
 		else
-			if (not FinderCache.completedScan) then
+			local tocv = select(4, GetBuildInfo())
+			if not (tocv == FinderCache.__tocversion) then
+				-- let player know the database is probably out of date
+				print(fmsg("|cfff00000Hey, the item cache may be out of date (Major game update?)! You should consider rebuilding it with|r |cffffffff'/finder rebuild'|r"))
+			elseif (not FinderCache.completedScan) then
+				-- let the player know there doesn't appear to be any item cache built
 				print(fmsg("|cfff00000It looks like you have not built the item cache! Try|r |cffffffff'/finder rebuild'|cfff00000 to populate the cache."))
 			else
 				print(fmsg("Item cache looks |cff00f000OK|r."))
@@ -238,6 +243,7 @@ local function rebuildCache(startID, endID)
 				frame:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
 				hush = false
 				FinderCache.completedScan = true
+				FinderCache.__tocversion = select(4, GetBuildInfo())
 
 				local msg = ("Finished rebuilding cache! Took: %.0f seconds"):format(((GetTime() - startedTimer)))
 				print(fmsg(msg))
