@@ -1,4 +1,4 @@
-## Interface: 11305
+## Interface: 11306
 ## Title: |cffa335eeFinder|r
 ## Author: Avael
 ## Version: 0.1.6-fix
