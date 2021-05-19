@@ -3,6 +3,11 @@ local ADDON, finder = ...
 --SavedVariables: FinderCache
 local FINDER_VERSION = GetAddOnMetadata(ADDON, "Version")
 
+local ExpansionData = {
+	[0] = {name = "Vanilla", maxItemID = 25000, color = "|cffe6cc80"},
+	[1] = {name = "TBC", maxItemID = 190000, color = "|cff67f100"},
+}
+
 -- local vars
 local cPurple = "|cffa335ee"
 local confirmTimer
@@ -16,11 +21,13 @@ local hush = false -- this silences rebuild progress updates for the duration of
 
 -- cache rebuild stuff
 -- TODO: some of this should be player options
-local CACHE_MAX_ITEMID = 25000 -- 175500 = max for retail BFA, 25000 = max for Classic 1.13.5
+local CURRENT_EXPANSION = GetExpansionLevel()
+local CACHE_MAX_ITEMID = ExpansionData[CURRENT_EXPANSION].maxItemID
 local CACHE_STOP_REBUILD = false
 local CACHE_REBUILDING = false -- changes to an int when rebuilding, indicating current itemID position
 local CACHE_IS_PREPARED = false
-local CACHE_REBUILD_BATCHINTERVAL = 0.1 -- should maybe be a config option?
+local AVERAGE_FRAMERATE = 60   -- reasonable first guess, hardly matters
+local CACHE_ITEMSPERFRAME = 1000 / 60 -- safe default, targeting ~30 second rebuild
 local MAX_WAIT_TIME = 5 -- the maximum amount of time we're willing to wait for GetItemInfo() to return results. If exceeded, print what we got so far, plus a warning
 local CACHE_CURRENT_REQUESTS = {} -- item info queue
 
@@ -30,16 +37,14 @@ local prepareCache
 
 -- enums
 local SCAN_SPEED = {
-	insane = 1000,
-	fast = 750,
-	normal = 500,
+	fast = 2000,
+	normal = 1000,
 	slow = 250,
-	glacial = 100,
 }
 
 -- helpers
 local fmsg = function(msg)
-	return "/|cffa335eeFinder|r:: " .. msg
+	return string.format("/|cffa335eeFinder [%s%s|r]|r:: %s", ExpansionData[CURRENT_EXPANSION].color, ExpansionData[CURRENT_EXPANSION].name, msg)
 end
 
 local function getDefaults(category)
@@ -65,6 +70,15 @@ local function tcontains(table, item)
 	end
 
 	return false
+end
+
+-- maintains an average framerate and item scanning speed
+local function UpdateItemsPerFrame()
+	AVERAGE_FRAMERATE = (AVERAGE_FRAMERATE + GetFramerate()) / 2
+	local speed = SCAN_SPEED[FinderOptions.speed] or SCAN_SPEED.normal
+	CACHE_ITEMSPERFRAME = math.ceil(speed / AVERAGE_FRAMERATE)
+
+	C_Timer.After(5, UpdateItemsPerFrame)
 end
 
 -- event frame setup
@@ -96,20 +110,9 @@ function handlers.ADDON_LOADED(self, ...)
 		end
 
 		-- check database version and try to upgrade if possible
-		local dbUpgraded, success, message = finder.db.checkDBVersion(FinderCache)
-		if dbUpgraded then
-			if success then
-				-- successful db upgrade, mention it
-				print(fmsg("Item cache was |cffff8000UPGRADED|r to version |cffa335ee%i|r."):format(message))
-			else
-				-- failed db upgrade!!
-				-- TODO: wipe it and let the player know
-				print(fmsg("|cfff00000!!Item cache was CORRUPT and could NOT be repaired!! It has been wiped out :(|r"))
-				print(fmsg("|cfff00000!!Error given: %s|r"):format(message))
-				print(fmsg("|cfff00000!!Please rebuild (|cffffffff'/finder rebuild'|cfff00000) to re-populate the cache.|r"))
-				prepareCache()
-			end
-		else
+		local dbOutdated = finder.db.isDatabaseOutdated(FinderCache)
+
+		if dbOutdated == 0 then
 			local tocv = select(4, GetBuildInfo())
 			if not (tocv == FinderCache.__tocversion) then
 				-- let player know the database is probably out of date
@@ -120,8 +123,19 @@ function handlers.ADDON_LOADED(self, ...)
 			else
 				print(fmsg("Item cache looks |cff00f000OK|r."))
 			end
+		else
+			-- let the player know the db is incompatible and should be rebuilt.
+			if dbOutdated < 0 then
+				print(fmsg("|cfff00000!!Item cache is from an old version of Finder and may not work!|r"))
+			elseif dbOutdated > 0 then
+				print(fmsg("|cfff00000!!Item cache is from a future version of Finder and may not work! |cff9d9d9dAre you a time traveler?|r"))
+			end
+
+			print(fmsg("|cfff00000!!Please rebuild (|cffffffff'/finder rebuild'|cfff00000) to build a fresh item cache.|r"))
 		end
 
+		-- start the rate tracker, it'll self-sustain after this call
+		C_Timer.After(2, UpdateItemsPerFrame)
 	end
 end
 
@@ -166,7 +180,7 @@ function addOrUpdateCache(validID)
 	itemEquipLoc, itemIcon, itemSellPrice, itemClassID, itemSubClassID, bindType, expacID, itemSetID,
 	isCraftingReagent = GetItemInfo(validID)
 
-	FinderCache[itemClassID][validID] = itemName
+	FinderCache[itemClassID or -1][validID] = itemName
 end
 
 -- stop any in-progress cache rebuild
@@ -197,17 +211,8 @@ local function rebuildCache(startID, endID)
 		local startedTimer = GetTime()
 		local itemsTotal = #validIDs
 
-		local batchsize = math.floor((function()
-			if FinderOptions.speed == "custom" then
-				return FinderOptions.custombatchsize
-			else
-				return SCAN_SPEED[FinderOptions.speed] or SCAN_SPEED.glacial
-			end
-		end)() * CACHE_REBUILD_BATCHINTERVAL)
-
-		print(batchsize)
-
-		print(fmsg(("Rebuilding item cache... This should take at most ~%.0f seconds. Type '/finder hush' to disable progress updates for this rebuild. Type '/finder stop' to abort the rebuild."):format((itemsTotal / batchsize * CACHE_REBUILD_BATCHINTERVAL))))
+		print(fmsg(string.format("Rebuilding item cache... ETA ~%i seconds", itemsTotal / (CACHE_ITEMSPERFRAME * AVERAGE_FRAMERATE))))
+		print(fmsg(("Type '/finder hush' to disable progress updates for this rebuild. Type '/finder stop' to abort the rebuild.")))
 
 		local function worker()
 			if CACHE_STOP_REBUILD or (not CACHE_REBUILDING) then
@@ -215,7 +220,7 @@ local function rebuildCache(startID, endID)
 				CACHE_STOP_REBUILD = false
 				CACHE_REBUILDING = false
 			elseif CACHE_REBUILDING < #validIDs then
-				local nextBatch = math.min(itemsTotal - CACHE_REBUILDING, batchsize)
+				local nextBatch = math.min(itemsTotal - CACHE_REBUILDING, CACHE_ITEMSPERFRAME)
 
 				-- queries for a batch of items
 				for i=CACHE_REBUILDING, (CACHE_REBUILDING + nextBatch) - 1 do
@@ -250,21 +255,12 @@ local function rebuildCache(startID, endID)
 			end
 		end
 
-		tickerHandle = C_Timer.NewTicker(CACHE_REBUILD_BATCHINTERVAL, worker, itemsTotal)
+		tickerHandle = C_Timer.NewTicker(0, worker, itemsTotal) -- runs every frame
 	end
 end
 
 -- print search results
 local function printResults(results, hits, searchTime, expired)
-	--[[
-	results = {
-		[0] = {
-			items = {},
-			count = 0
-		}
-	}
-	]]
-
 	local output = DEFAULT_CHAT_FRAME
 	local timeStr = ("|cff9d9d9d(%ims)|r"):format(math.floor(searchTime) * 1000)
 
