@@ -69,6 +69,7 @@ Finally, you can stop the current rebuild using `/finder stop/abort/cancel`. Thi
 **/Finder** allows some configuration options and various commands through the `/finder` command, however most features available are undocumented for now, sorry.
 Here are a few:
 
+* `/finder greeting` toggles login-greeting message. If disabled, **/Finder** will still print login messages if there are errors with the Item Cache.
 * `/finder set <option> <value>` allows you to change some configuration options. Right now, only 3 options are exposed:
     * `<progressinterval> <5000>` - this sets how many item requests to complete, before posting a progress update message to the chat window.
     * `<speed> <slow>` - some presets for rebuild speed. Valid options are:
