@@ -465,7 +465,7 @@ local function commandHandler(msg, EditBox)
 		stopCacheRebuild()
 	elseif cmd == "greeting" then
 		FinderOptions.greeting = not FinderOptions.greeting
-		print(fmsg(string.format("Loging greeting now %s", FinderOptions.greeting and "enabled." or "disabled.")))
+		print(fmsg(string.format("Login greeting now %s", FinderOptions.greeting and "enabled." or "disabled.")))
 	elseif cmd == "set" then
 		-- we're setting an option!
 		local name, value = args[2], args[3]
