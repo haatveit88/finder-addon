@@ -91,8 +91,6 @@ function handlers.ADDON_LOADED(self, ...)
 	if ... == ADDON then
 		frame:UnregisterEvent("ADDON_LOADED")
 
-		print(fmsg("|cff9d9d9dby |cffffffffAvael|r |cff9d9d9d@ |cff00ccffHydraxian Waterlords EU |cff9d9d9dhas loaded \\o/"))
-
 		-- Hook up SavedVariable
 		FinderOptions = FinderOptions or getDefaults("options")
 
@@ -102,11 +100,19 @@ function handlers.ADDON_LOADED(self, ...)
 			FinderOptions.speed = "normal"
 			FinderOptions._ver = FINDER_VERSION
 		end
+		if FinderOptions.greeting == nil then
+			-- greeting option added in v1.9
+			FinderOptions.greeting = true
+		end
 
 		if (not (type(FinderCache) == "table")) then
 			prepareCache()
 		else
 			CACHE_IS_PREPARED = true
+		end
+
+		if FinderOptions.greeting then
+			print(fmsg("|cff9d9d9dby |cffffffffAvael|r |cff9d9d9d@ |cff00ccffHydraxian Waterlords EU |cff9d9d9dhas loaded \\o/"))
 		end
 
 		-- check database version and try to upgrade if possible
@@ -121,7 +127,9 @@ function handlers.ADDON_LOADED(self, ...)
 				-- let the player know there doesn't appear to be any item cache built
 				print(fmsg("|cfff00000It looks like you have not built the item cache! Try|r |cffffffff'/finder rebuild'|cfff00000 to populate the cache."))
 			else
-				print(fmsg("Item cache looks |cff00f000OK|r."))
+				if FinderOptions.greeting then
+					print(fmsg("Item cache looks |cff00f000OK|r."))
+				end
 			end
 		else
 			-- let the player know the db is incompatible and should be rebuilt.
@@ -455,6 +463,9 @@ local function commandHandler(msg, EditBox)
 	elseif cmd == "stop" or cmd == "abort" or cmd == "cancel" then
 		print(fmsg("Stopping cache rebuild"))
 		stopCacheRebuild()
+	elseif cmd == "greeting" then
+		FinderOptions.greeting = not FinderOptions.greeting
+		print(fmsg(string.format("Loging greeting now %s", FinderOptions.greeting and "enabled." or "disabled.")))
 	elseif cmd == "set" then
 		-- we're setting an option!
 		local name, value = args[2], args[3]

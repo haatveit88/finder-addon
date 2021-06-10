@@ -5,4 +5,5 @@ finder.defaults = {}
 finder.defaults.options = {
     progressinterval = 5000,
     speed = "normal",
+    greeting = true,
 }
