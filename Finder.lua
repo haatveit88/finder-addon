@@ -3,9 +3,14 @@ local ADDON, finder = ...
 --SavedVariables: FinderCache
 local FINDER_VERSION = GetAddOnMetadata(ADDON, "Version")
 
+-- Finder does a hyperfast scan first to weed out valid IDs, so a very high maxItemID is not an issue
 local ExpansionData = {
 	[0] = {name = "Vanilla", maxItemID = 25000, color = "|cffe6cc80"},
 	[1] = {name = "TBC", maxItemID = 190000, color = "|cff67f100"},
+	[2] = {name = "WoTLK", maxItemID = 200500, color = "|cff248de9"},
+	[3] = {name = "Cataclysm", maxItemID = 200500, color = "|cffff5A00"},	-- maxItemID not configured yet
+	[4] = {name = "MoP", maxItemID = 200500, color = "|cff00FF96"},			-- maxItemID not configured yet
+	[5] = {name = "WoD", maxItemID = 200500, color = "|cffCC5500"}, -- let's hope we never get to this one, eh?
 }
 
 -- local vars
