@@ -5,7 +5,7 @@ local DB_CURRENT_VERSION = 3
 -- initialize the db (SavedVariables table) to be ready for use
 local function initNewDB(db)
     -- plug in item class IDs
-    for i = 0, NUM_LE_ITEM_CLASSS do
+    for i = 0, NUM_LE_ITEM_CLASSS or NUM_LE_ITEM_CLASSSES or 19 do
         db[i] = {}
     end
 
